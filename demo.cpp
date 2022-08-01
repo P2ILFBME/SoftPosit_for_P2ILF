@@ -4,6 +4,7 @@
 
 #include "./softposit/softposit.hpp"
 #include"./softposit/softposit.cpp"
+#include "./read_pcd.cpp"
 
 int main()
 {
@@ -51,6 +52,7 @@ int main()
       -0.7500
       };
 
+      
   std::cout<<"load world points"<<std::endl;
   for (uint i=0u; i<raw_worldPts.size(); i+=3){
     worldPts.push_back(bloody::point3d_type{raw_worldPts[i], raw_worldPts[i+1], raw_worldPts[i+2]});
@@ -62,8 +64,11 @@ int main()
   bloody::Pose_type initpose;
 
   initpose.rot = arma::mat("0, 1, 0; -1, 0, 0; 0, 0, 1").t();
-  initpose.trans = bloody::point3d_type{0, 0, 30};
-
+  //initpose.rot = arma::mat("0.1442, -0.7269, -0.6715; 0.9115, 0.3617, -0.1957; 0.3851, -0.5838, 0.7147").t();
+  //initpose.trans = bloody::point3d_type{5.4234, -1.0623, 43.2906};
+  initpose.trans = bloody::point3d_type{0, 0.1, 29.8};
+  std::vector<bloody::point2di_type> imagePts_projected = project_3DPoints(worldPts, initpose.rot.t(),  initpose.trans, caminfo);
+  std::cout<<project_3DPoints<<std::endl;
   auto maybe_pose = softposit(
     imagePts,
     worldPts,

@@ -18,6 +18,7 @@ namespace bloody{
   using mat3_type = arma::mat33;
 
   using point2di_type = arma::ivec2;
+  using point3di_type = arma::ivec3;
   using point2d_type = arma::vec2;
   using point3d_type = arma::vec3;
 

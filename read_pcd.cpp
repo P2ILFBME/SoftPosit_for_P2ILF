@@ -7,7 +7,7 @@
 #include <pcl-1.10/pcl/visualization/pcl_visualizer.h>
 #include <pcl-1.10/pcl/visualization/cloud_viewer.h>
 #include <pcl-1.10/pcl/console/parse.h>
-
+#include "./softposit/softposit.hpp"
 
 using namespace std;
 
@@ -42,4 +42,22 @@ vector<float> read_pcd_from_json(){
     pcl::io::savePCDFile("../toy.pcd", *point_cloud_ptr);
     system("pause");
     return worldPts;
+}
+
+std::vector<bloody::point2di_type> project_3DPoints(std::vector<bloody::point3d_type> worldPts, std::vector<bloody::point2di_type> older_image_pts, arma::mat rot,  bloody::point3d_type trans, bloody::CamInfo_type caminfo) // try to project point cloud data to image
+{   
+    float f = caminfo.focalLength;
+    std::vector<bloody::point2di_type> imagePts=older_image_pts;
+    
+    for(int i=0; i<worldPts.size();i++){
+        auto w = arma::dot(rot.row(2),worldPts[i])+trans(2);
+        auto x = arma::dot(rot.row(0),worldPts[i])+trans(0);
+        auto y = arma::dot(rot.row(1),worldPts[i])+trans(1);
+        if(((f*x/w+caminfo.center(0))<720)&&((f*x/w+caminfo.center(0)))>0&&((f*y/w+caminfo.center(1)))>0&&((f*y/w+caminfo.center(1)))<1280){
+        
+            imagePts.push_back((bloody::point2di_type{f*x/w, f*y/w}+caminfo.center));
+        }
+        //std::cout<<x<<"   "<<y<<"   "<<w<<std::endl;
+    }
+    return imagePts;
 }
