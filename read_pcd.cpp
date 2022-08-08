@@ -50,14 +50,17 @@ std::vector<bloody::point2di_type> project_3DPoints(std::vector<bloody::point3d_
     std::vector<bloody::point2di_type> imagePts=older_image_pts;
     
     for(int i=0; i<worldPts.size();i++){
+        //std::cout<<worldPts[i]<<"//"<<rot.row(2)<<std::endl;
         auto w = arma::dot(rot.row(2),worldPts[i])+trans(2);
         auto x = arma::dot(rot.row(0),worldPts[i])+trans(0);
         auto y = arma::dot(rot.row(1),worldPts[i])+trans(1);
-        if(((f*x/w+caminfo.center(0))<720)&&((f*x/w+caminfo.center(0)))>0&&((f*y/w+caminfo.center(1)))>0&&((f*y/w+caminfo.center(1)))<1280){
+        if(((f*x/w+caminfo.center(0))<1280)&&((f*x/w+caminfo.center(0)))>0&&((f*y/w+caminfo.center(1)))>0&&((f*y/w+caminfo.center(1)))<720){
         
             imagePts.push_back((bloody::point2di_type{f*x/w, f*y/w}+caminfo.center));
         }
-        //std::cout<<x<<"   "<<y<<"   "<<w<<std::endl;
+        // std::cout<<x<<"   "<<y<<"   "<<w<<std::endl;
+        
     }
+    // std::cout<<worldPts.size()<<std::endl;
     return imagePts;
 }

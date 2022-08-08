@@ -1,0 +1,40 @@
+[Buildset]
+BuildItems=@Variant(\x00\x00\x00\t\x00\x00\x00\x00\x01\x00\x00\x00\x0b\x00\x00\x00\x00\x01\x00\x00\x00&\x00S\x00o\x00f\x00t\x00P\x00o\x00s\x00i\x00t\x00_\x00f\x00o\x00r\x00_\x00P\x002\x00I\x00L\x00F)
+
+[CMake]
+Build Directory Count=1
+Current Build Directory Index-Host System=0
+
+[CMake][CMake Build Directory 0]
+Build Directory Path=/home/xiaojiahao/code/SoftPosit_for_P2ILF/build
+Build Type=Debug
+CMake Binary=/usr/bin/cmake
+CMake Executable=/usr/bin/cmake
+Environment Profile=
+Extra Arguments=
+Install Directory=
+Runtime=Host System
+
+[Launch]
+Launch Configurations=Launch Configuration 0
+
+[Launch][Launch Configuration 0]
+Configured Launch Modes=execute
+Configured Launchers=nativeAppLauncher
+Name=softposit
+Type=Native Application
+
+[Launch][Launch Configuration 0][Data]
+Arguments=
+Dependencies=@Variant(\x00\x00\x00\t\x00\x00\x00\x00\x01\x00\x00\x00\x0b\x00\x00\x00\x00\x02\x00\x00\x00&\x00S\x00o\x00f\x00t\x00P\x00o\x00s\x00i\x00t\x00_\x00f\x00o\x00r\x00_\x00P\x002\x00I\x00L\x00F\x00\x00\x00\x12\x00s\x00o\x00f\x00t\x00p\x00o\x00s\x00i\x00t)
+Dependency Action=Build
+EnvironmentGroup=
+Executable=file:///home/xiaojiahao/code/SoftPosit_for_P2ILF
+External Terminal=konsole --noclose --workdir %workdir -e %exe
+Project Target=SoftPosit_for_P2ILF,softposit
+Use External Terminal=false
+Working Directory=
+isExecutable=false
+
+[Project]
+VersionControlSupport=kdevgit

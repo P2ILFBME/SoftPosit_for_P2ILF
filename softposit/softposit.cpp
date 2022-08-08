@@ -21,15 +21,15 @@ namespace bloody{
 
         std::vector<stat_info> stats;
 
-        auto alpha = 0;//9.21*pow(param.noiseStd,2) + 1;
-        auto maxDelta = 10;  //sqrt(alpha)/2; 20;         //  Max allowed error per world point.
+        auto alpha = 5;//9.21*pow(param.noiseStd,2) + 1;
+        auto maxDelta = 60;  //sqrt(alpha)/2; 20;         //  Max allowed error per world point.
 
         auto betaFinal = 0.5;                  // Terminate iteration when beta == betaFinal.
         auto betaUpdate = 1.05;                // Update rate on beta.
         auto epsilon0 = 0.01;                  // Used to initialize assignement matrix.
 
-        auto maxCount = 1;
-        auto minBetaCount = 10;     
+        auto maxCount = 5;
+        auto minBetaCount = 1500;     
         auto nbImagePts = imagePts.size();
         auto nbWorldPts = worldPts.size();
 
@@ -41,13 +41,15 @@ namespace bloody{
         std::vector<point2d_type> _centeredImage(imagePts.size());
         arma::mat imageColors = arma::ones<arma::mat>(nbImagePts, 1)*2;
         arma::mat color_map = arma::join_rows(color_map, imageColors);
+        double maxNumMatch=0;
+        
         
         CamInfo_type caminfo;
         if (maybe_caminfo)
-        caminfo = *maybe_caminfo;
+            caminfo = *maybe_caminfo;
         else{
-        caminfo.focalLength = 1;
-        caminfo.center = point2di_type{0, 0};
+            caminfo.focalLength = 1;
+            caminfo.center = point2di_type{0, 0};
         }
 
         std::cout<<"init: "<<std::endl<<initpose.rot<<std::endl<<initpose.trans<<std::endl;
@@ -62,9 +64,9 @@ namespace bloody{
 
         for (int j=0; j<centeredImage.n_cols; ++j)
         {
-        for (int i=0; i<centeredImage.n_rows; ++i){
-            centeredImage(i,j) = _centeredImage[i][j]; //i->y,j->x
-        }
+            for (int i=0; i<centeredImage.n_rows; ++i){
+                centeredImage(i,j) = _centeredImage[i][j]; //i->y,j->x
+            }
         }
 
         //std::cout<<"centered image :"<<centeredImage<<std::endl;
@@ -72,7 +74,7 @@ namespace bloody{
         arma::mat homogeneousWorldPts = arma::zeros<arma::mat>(worldPts.size(), 4).eval();
         for (int i=0; i<worldPts.size(); ++i)
         {
-        homogeneousWorldPts.row(i) = arma::rowvec{worldPts[i][0], worldPts[i][1], worldPts[i][2],1};
+            homogeneousWorldPts.row(i) = arma::rowvec{worldPts[i][0], worldPts[i][1], worldPts[i][2],1};
         }
         //std::cout<<"begin to make world point homogeneous:" << homogeneousWorldPts <<std::endl;
 
@@ -97,170 +99,188 @@ namespace bloody{
         int debug_loop = 0;
         while (beta < betaFinal && !assignConverged)
         {
-        std::cout<<boost::format("debug loop: %1%") % (debug_loop++)<<std::endl;
+            std::cout<<boost::format("debug loop: %1%") % (debug_loop++)<<std::endl;
 
-        arma::mat projectedU = homogeneousWorldPts * r1T;
-        arma::mat projectedV = homogeneousWorldPts * r2T;
+            arma::mat projectedU = homogeneousWorldPts * r1T;
+            arma::mat projectedV = homogeneousWorldPts * r2T;
 
-        arma::mat replicatedProjectedU = imageOnes * projectedU.t();
-        arma::mat replicatedProjectedV = imageOnes * projectedV.t();
+            arma::mat replicatedProjectedU = imageOnes * projectedU.t();
+            arma::mat replicatedProjectedV = imageOnes * projectedV.t();
 
-        //std::cout<<"r1T, r2T used:"<<std::endl<<r1T<<std::endl<<r2T<<std::endl;
-        //std::cout<<"projected uv:"<<std::endl<<projectedU<<std::endl<<projectedV<<std::endl;
-        //std::cout<<"reprojected uv"<<std::endl;
-        //std::cout<<arma::mat(replicatedProjectedU)<<std::endl<<arma::mat(replicatedProjectedV)<<std::endl;
+            //std::cout<<"r1T, r2T used:"<<std::endl<<r1T<<std::endl<<r2T<<std::endl;
+            //std::cout<<"projected uv:"<<std::endl<<projectedU<<std::endl<<projectedV<<std::endl;
+            //std::cout<<"reprojected uv"<<std::endl;
+            //std::cout<<arma::mat(replicatedProjectedU)<<std::endl<<arma::mat(replicatedProjectedV)<<std::endl;
 
-        //std::cout<<"SOP"<<std::endl;
-        auto wkxj = centeredImage.col(0) * wk.t();
-        auto wkyj = centeredImage.col(1) * wk.t();
+            //std::cout<<"SOP"<<std::endl;
+            auto wkxj = centeredImage.col(0) * wk.t();
+            auto wkyj = centeredImage.col(1) * wk.t();
 
-        std::cout<<"wkxj, wkyj"<<std::endl;
-        //std::cout<<wkxj<<std::endl<<wkyj<<std::endl;
+            //std::cout<<"wkxj, wkyj"<<std::endl;
+            //std::cout<<wkxj<<std::endl<<wkyj<<std::endl;
 
-        //arma::mat distMat = caminfo.focalLength*caminfo.focalLength*(arma::square(replicatedProjectedU - wkxj) + arma::square (replicatedProjectedV - wkyj));
-        arma::mat distMat = 1.0*1.0*(arma::square(replicatedProjectedU - wkxj) + arma::square (replicatedProjectedV - wkyj));
-        std::cout<<"dist mat:"<<std::endl<<distMat<<std::endl;
+            //arma::mat distMat = caminfo.focalLength*caminfo.focalLength*(arma::square(replicatedProjectedU - wkxj) + arma::square (replicatedProjectedV - wkyj));
+            arma::mat distMat = 1.0*1.0*(arma::square(replicatedProjectedU - wkxj) + arma::square (replicatedProjectedV - wkyj));
+            std::cout<<"dist mat:"<<std::endl<<distMat<<std::endl;
 
-        assignMat(arma::span(0, nbImagePts-1), arma::span(0, nbWorldPts-1)) = scale*arma::exp(-beta*(distMat - alpha));
-        assignMat.col(nbWorldPts) = 1e-20 * arma::ones<arma::vec>(nbImagePts+1);
-        assignMat.row(nbImagePts) = 1e-20 * arma::ones<arma::rowvec>(nbWorldPts+1);
-        std::cout<<"assign befor sinkhorn:"<<std::endl<<assignMat<<std::endl;
+            assignMat(arma::span(0, nbImagePts-1), arma::span(0, nbWorldPts-1)) = scale*arma::exp(-beta*(distMat - alpha));
+            assignMat.col(nbWorldPts) = scale*arma::exp(-beta*arma::ones<arma::vec>(nbImagePts+1)*1e10-alpha);
+            assignMat.row(nbImagePts) = scale*arma::exp(-beta*arma::ones<arma::vec>(nbWorldPts+1)*1e10-alpha).t(); //scale
+            //std::cout<<"assign befor sinkhorn:"<<std::endl<<assignMat<<std::endl;
 
-        //assignMat = sinkhornImp (assignMat);    // My "improved" Sinkhorn.
-        assignMat = sinkhornSlack (assignMat);    
-        std::cout<<"after sinkhorn Slack:"<<std::endl<<assignMat<<std::endl;
+            //assignMat = sinkhornImp (assignMat);    // My "improved" Sinkhorn.
+            assignMat = sinkhornSlack (assignMat);    
+            std::cout<<"after sinkhorn Slack:"<<std::endl<<assignMat<<std::endl;
 
-        auto numMatchPts = numMatches(assignMat);
-        std::cout<<"num matches: "<<numMatchPts<<std::endl;
+            auto numMatchPts = numMatches(assignMat);
+            std::cout<<"num matches: "<<numMatchPts<<std::endl;
 
-        auto sumNonslack = arma::accu(assignMat.submat(0,0,nbImagePts-1,nbWorldPts-1));
-        std::cout<<"sum non slack: "<<sumNonslack<<std::endl;
+            auto sumNonslack = arma::accu(assignMat.submat(0,0,nbImagePts-1,nbWorldPts-1));
+            //std::cout<<"sum non slack: "<<sumNonslack<<std::endl;
 
-        arma::mat summedByColAssign = arma::sum(assignMat.submat(0, 0, nbImagePts-1, nbWorldPts-1));
-        std::cout<<summedByColAssign<<std::endl;
-        arma::mat sumSkSkT = arma::zeros<arma::mat>(4, 4);
-        
-        for(auto  k = 0; k<nbWorldPts; ++k){
-            sumSkSkT = sumSkSkT + summedByColAssign(k) * homogeneousWorldPts.row(k).t() * homogeneousWorldPts.row(k);
-        }
-
-        std::cout<<"check ill-condition"<<std::endl;
-        if (arma::cond(sumSkSkT) > 1e40){
-            std::cout<<"sumSkSkT is ill-conditioned, termininating search."<<std::endl;
-            return boost::none;
-        }
-
-        arma::mat objectMat = arma::inv(sumSkSkT);                           // Inv(L), a 4x4 matrix.
-        poseConverged = 0;                              // Initialize for POSIT loop.
-        auto pose_iter_count = 0;
-
-        // Save the previouse pose vectors for convergence checks.
-        arma::vec4 r1Tprev = r1T;
-        arma::vec4 r2Tprev = r2T;
-
-        double Tx, Ty, Tz;
-        arma::vec r1, r2, r3;
-        double delta;
-
-        std:cout<<"begin converge loop"<<std::endl;
-        
-
-            arma::vec weightedUi(4, arma::fill::zeros) ;
-            arma::vec weightedVi(4, arma::fill::zeros) ;
-
-            for (int j=0;j<nbImagePts; ++j){
-            for (int k=0; k<nbWorldPts; ++k){
-                weightedUi = weightedUi + assignMat(j,k) * wk(k) * centeredImage(j,0) * homogeneousWorldPts.row(k).t();
-                weightedVi = weightedVi + assignMat(j,k) * wk(k) * centeredImage(j,1) * homogeneousWorldPts.row(k).t();
-            }
+            arma::mat summedByColAssign = arma::sum(assignMat.submat(0, 0, nbImagePts-1, nbWorldPts-1));
+            // std::cout<<summedByColAssign<<std::endl;
+            arma::mat sumSkSkT = arma::zeros<arma::mat>(4, 4);
+            
+            for(auto  k = 0; k<nbWorldPts; ++k){
+                sumSkSkT = sumSkSkT + summedByColAssign(k) * homogeneousWorldPts.row(k).t() * homogeneousWorldPts.row(k);
             }
 
-            r1T= objectMat * weightedUi;
-            r2T = objectMat * weightedVi;
+            std::cout<<"check ill-condition"<<std::endl;
+            if (arma::cond(sumSkSkT) > 1e40){
+                std::cout<<"sumSkSkT is ill-conditioned, termininating search."<<std::endl;
+                return boost::none;
+            }
+            arma::mat objectMat;
+            try{
+                objectMat = arma::inv(sumSkSkT);                           // Inv(L), a 4x4 matrix.
+            }
+            catch(runtime_error error){
+                show_projected_img(imagePts_projected, color_map);
+                throw runtime_error("can't get result!");
+            }
+            poseConverged = 0;                              // Initialize for POSIT loop.
+            auto pose_iter_count = 0;
 
-            arma::mat U, V;
-            arma::vec s;
-            arma::mat X(3,2);
+            // Save the previouse pose vectors for convergence checks.
+            arma::vec4 r1Tprev = r1T;
+            arma::vec4 r2Tprev = r2T;
 
-            X.col(0) = r1T(arma::span(0,2));
-            X.col(1) = r2T(arma::span(0,2));
+            double Tx, Ty, Tz;
+            arma::vec r1, r2, r3;
+            double delta;
 
-            std::cout<<"svd"<<std::endl;
-            arma::svd(U,s,V, X);
+            std:cout<<"begin converge loop"<<std::endl;
+            while (poseConverged == false & pose_iter_count < maxCount)
+            {
+                arma::vec weightedUi(4, arma::fill::zeros) ;
+                arma::vec weightedVi(4, arma::fill::zeros) ;
 
-            arma::mat A = U * arma::mat("1 0; 0 1; 0 0") * V.t();
-            std::cout<<"r1T, r2T update: "<<r1T<< std::endl<<r2T<<std::endl;
-            double s1 = -arma::sqrt(r1T(arma::span(0,2)).t()*r1T(arma::span(0,2))).eval()(0,0);
-            std::cout<<"S1   "<<s1<<std::endl;
-            r1 = arma::vec3 {r1T(0)/s1, r1T(1)/s1, r1T(2)/s1};
-            r2 = arma::vec3 {r2T(0)/s1, r2T(1)/s1, r2T(2)/s1};     
-            r3 = arma::cross(r1,r2);
-            Tz = caminfo.focalLength/s1;
-            //Tz = 2 / (s(0) + s(1));
-            Tx = r1T(3)/s1;
-            Ty = r2T(3)/s1;
-            auto r3T= arma::vec{r3[0], r3[1], r3[2], Tz};
+                for (int j=0;j<nbImagePts; ++j){
+                for (int k=0; k<nbWorldPts; ++k){
+                    weightedUi = weightedUi + assignMat(j,k) * wk(k) * centeredImage(j,0) * homogeneousWorldPts.row(k).t();
+                    weightedVi = weightedVi + assignMat(j,k) * wk(k) * centeredImage(j,1) * homogeneousWorldPts.row(k).t();
+                }
+                }
+
+                r1T= objectMat * weightedUi;
+                r2T = objectMat * weightedVi;
+
+                //arma::mat U, V;
+                arma::vec s;
+                arma::mat X(3,2);
+
+                X.col(0) = r1T(arma::span(0,2));
+                X.col(1) = r2T(arma::span(0,2));
+
+                //std::cout<<"svd"<<std::endl;
+                //arma::svd(U,s,V, X);
+
+                //arma::mat A = U * arma::mat("1 0; 0 1; 0 0") * V.t();
+                //std::cout<<"r1T, r2T update: "<<r1T<< std::endl<<r2T<<std::endl;
+                double s1 = -arma::sqrt(r1T(arma::span(0,2)).t()*r1T(arma::span(0,2))).eval()(0,0);
+                // std::cout<<"S1   "<<s1<<std::endl;
+                r1 = arma::vec3 {r1T(0)/s1, r1T(1)/s1, r1T(2)/s1};
+                r2 = arma::vec3 {r2T(0)/s1, r2T(1)/s1, r2T(2)/s1};     
+                r3 = arma::cross(r1,r2);
+                Tz = caminfo.focalLength/s1;
+                //Tz = 2 / (s(0) + s(1));
+                Tx = r1T(3)/s1;
+                Ty = r2T(3)/s1;
+                auto r3T= arma::vec{r3[0], r3[1], r3[2], Tz};
 
 
-            r1T = s1*arma::vec{r1[0], r1[1], r1[2], Tx};
-            r2T = s1*arma::vec{r2[0], r2[1], r2[2], Ty};
-            std::cout<<"r1T, r2T update: "<<r1T<< std::endl<<r2T<<std::endl;
+                r1T = s1*arma::vec{r1[0], r1[1], r1[2], Tx};
+                r2T = s1*arma::vec{r2[0], r2[1], r2[2], Ty};
+                //std::cout<<"r1T, r2T update: "<<r1T<< std::endl<<r2T<<std::endl;
 
-            wk = homogeneousWorldPts * r3T /Tz;
+                wk = homogeneousWorldPts * r3T /Tz;
 
-            std::cout<<"delta"<<std::endl;
-            delta = sqrt(arma::accu(assignMat.submat(0, 0, nbImagePts-1, nbWorldPts-1) % distMat)/nbWorldPts);
-            poseConverged = delta < maxDelta;
-            std::cout<<"delta    "<<delta<<std::endl;
-            std::cout<<"pose converged:"<<poseConverged<<std::endl;
+                std::cout<<"delta"<<std::endl;
+                delta = sqrt(arma::accu(assignMat.submat(0, 0, nbImagePts-1, nbWorldPts-1) % distMat)/nbWorldPts);
+                poseConverged = delta < maxDelta;
+                std::cout<<"delta    "<<delta<<std::endl;
+                std::cout<<"pose converged:"<<poseConverged<<std::endl;
 
-            std::cout<<"generate trace"<<std::endl;
+                std::cout<<"generate trace"<<std::endl;
 
-            auto trace = std::vector<double>{
-            beta ,delta ,double(numMatchPts)/nbWorldPts ,
-            double(sumNonslack)/nbWorldPts,
-            arma::accu(arma::square(r1T-r1Tprev)) + arma::accu(arma::square(r2T-r2Tprev))
-            };
+                auto trace = std::vector<double>{
+                beta ,delta ,double(numMatchPts)/nbWorldPts ,
+                double(sumNonslack)/nbWorldPts,
+                arma::accu(arma::square(r1T-r1Tprev)) + arma::accu(arma::square(r2T-r2Tprev))
+                };
 
-            std::cout<<"keep log"<<std::endl;
-            stats.push_back(arma::vec( trace));
+                std::cout<<"keep log"<<std::endl;
+                stats.push_back(arma::vec( trace));
 
-            pose_iter_count = pose_iter_count + 1;
-        
-
-        beta = betaUpdate * beta;
-        betaCount = betaCount + 1;
-        assignConverged = poseConverged && betaCount > minBetaCount;
-
-        pose.trans = arma::vec{Tx, Ty, Tz};
-        pose.rot.row(0) = r1.t();
-        pose.rot.row(1) = r2.t();
-        pose.rot.row(2) = r3.t();
-
-        foundPose = (delta < maxDelta && betaCount > minBetaCount);
-
-        std::cout<<"updated pose:"<<std::endl<<pose.rot<<std::endl<<pose.trans<<std::endl;
-        //%% Log:
-        std::cout<<"converge loop ends"<<std::endl;
-        std::cout<<boost::format("pose found:%1%, delta exit:%2%, count exit:%3%")%foundPose%(delta<maxDelta)%(betaCount>minBetaCount)<<std::endl;
-        int size1 = imagePts_projected.size();
-        imagePts_projected = project_3DPoints(worldPts, imagePts_projected, pose.rot,  pose.trans, caminfo);
-        int size2 = imagePts_projected.size();
-        if(size2>size1)
-        {
-            if(beta < betaFinal && !assignConverged){
-                imageColors = arma::ones<arma::mat>(size2-size1, 1)*1;
+                pose_iter_count = pose_iter_count + 1;
+            }
+            if(numMatchPts>maxNumMatch){
+                maxNumMatch = double(numMatchPts);
                 
             }
-            else{
-                imageColors = arma::ones<arma::mat>(size2-size1, 1)*0;
+            
+            if(numMatchPts==0 or maxNumMatch==numMatchPts){
+                beta = betaUpdate * beta;
             }
-            std::cout<<color_map.size()<<"   "<<imageColors.size()<<std::endl;
-           color_map = arma::join_cols(color_map, imageColors); 
-        }
-        }
-        
+            beta = betaUpdate * beta;
+            std::cout<<"beta:  "<<beta<<std::endl;
+            betaCount = betaCount + 1;
+            assignConverged = (poseConverged && numMatchPts > 0.6*nbWorldPts);
 
+            pose.trans = arma::vec{Tx, Ty, Tz};
+            pose.rot.row(0) = r1.t();
+            pose.rot.row(1) = r2.t();
+            pose.rot.row(2) = r3.t();
+
+            foundPose = (delta < maxDelta && numMatchPts > 0.6*nbWorldPts);
+
+            std::cout<<"updated pose:"<<std::endl<<pose.rot<<std::endl<<pose.trans<<std::endl;
+            //%% Log:
+            std::cout<<"converge loop ends"<<std::endl;
+            std::cout<<boost::format("pose found:%1%, delta exit:%2%, count exit:%3%")%foundPose%(delta<maxDelta)%(betaCount>minBetaCount)<<std::endl;
+            int size1 = imagePts_projected.size();
+            imagePts_projected = project_3DPoints(worldPts, imagePts_projected, pose.rot,  pose.trans, caminfo);
+            int size2 = imagePts_projected.size();
+            if(size2>size1)
+            {
+                if(beta < betaFinal && !assignConverged){
+                    imageColors = arma::ones<arma::mat>(size2-size1, 1)*0;
+                    color_map = arma::join_cols(color_map, imageColors);
+                    show_projected_img(imagePts_projected, color_map);
+                    color_map(arma::span(size1,size2-1),0)=arma::ones<arma::mat>(size2-size1, 1)*1;
+                    
+                }
+                else{
+                    imageColors = arma::ones<arma::mat>(size2-size1, 1)*0;
+                    color_map = arma::join_cols(color_map, imageColors);
+            
+                }
+                std::cout<<color_map.size()<<"   "<<imageColors.size()<<std::endl;
+             
+            }
+            
+        }
         std::cout<<"pose converged:"<<std::endl << pose.rot<<pose.trans<<std::endl;
         show_projected_img(imagePts_projected, color_map);
         return make_tuple(pose, match_type());
@@ -272,7 +292,7 @@ namespace bloody{
     arma::mat normalizedMat ;
     auto iMaxIterSinkhorn=60;  // In PAMI paper
     auto fEpsilon2 = 0.001; // Used in termination of Sinkhorn Loop.
-
+    auto alpha = 1e-200;
     auto iNumSinkIter = 0;
     int nbRows = M.n_rows;
     int nbCols = M.n_cols;
@@ -286,14 +306,14 @@ namespace bloody{
       arma::rowvec McolSums = arma::sum(M); // Row vector.
       McolSums(nbCols-1) = 1; // Don't normalize slack col terms against each other.
       auto McolSumsRep = arma::ones<arma::vec>(nbRows) * McolSums ;
-      M = M / McolSumsRep;
-
+      M = M / (McolSumsRep+alpha);
+      //std::cout<<"McolSumsRep: "<<McolSumsRep<<std::endl;
       // Row normalization (except outlier row - do not normalize col slacks against each other)
       arma::colvec MrowSums = arma::sum(M, 1); // Column vector.
       MrowSums(nbRows-1) = 1; // Don't normalize slack row terms against each other.
       auto MrowSumsRep = MrowSums * arma::ones<arma::rowvec>(nbCols);
-      M = M / MrowSumsRep;
-
+      M = M / (MrowSumsRep+alpha);
+      //std::cout<<"MrowSumsRep: "<<MrowSumsRep<<std::endl;
       iNumSinkIter=iNumSinkIter+1;
       fMdiffSum=arma::accu(arma::abs(M-Mprev));
     }
