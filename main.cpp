@@ -35,12 +35,12 @@ int main()
   std::vector<bloody::point2di_type> fitImagePts;
   FitPolynomialCurve(imagePts, fitImagePts, 4,  A);
   // set inner parameter and outer parameter and softposit parameter
-  bloody::Param_type param{ 0.00004, 10.0}; //0.001
+  bloody::Param_type param{ 0.000004, 10.0}; //0.001
   bloody::CamInfo_type caminfo{500.0f, bloody::point2di_type{640, 360}}; // inner parameter of camera
   
   // set init pose change
-  Matx31f Rvec = Matx31f(0.3, 0.1, 0.2);
-  bloody::point3d_type trans = bloody::point3d_type{40, -20.39718, 30.29930};
+  Matx31f Rvec = Matx31f(2.5, 2.1, 2.4);
+  bloody::point3d_type trans = bloody::point3d_type{-700, 609, -1300};
   Matx33f dst;
   Rodrigues(Rvec, dst, noArray());
   arma::mat R_change(3,3);
@@ -68,11 +68,13 @@ int main()
   initPose.rot = R_change*initPose.rot;
   
   initPose.trans = bloody::point3d_type{-73.420, -223.39718, -66.29930}+trans;
-  //imagePts_projected = project_3DPoints(worldPts, imagePts_projected,  initpose.rot,  initpose.trans, caminfo);
   
+  // imagePts_projected = project_3DPoints(worldPts, imagePts_projected,  initPose.rot,  initPose.trans, caminfo);
+  std::vector<bloody::point2di_type> initProject;
+  initProject = project_3DPoints(worldPts, initProject,  initPose.rot,  initPose.trans, caminfo);
   arma::mat imageOnes = arma::ones<arma::mat>(nImagePts, 1)*2;
   arma::mat color_map = arma::join_rows(color_map, imageOnes);
-  show_projected_img(imagePts_projected, color_map, true);
+  show_projected_img(initProject, color_map, true);
   
 
   //begin softposit

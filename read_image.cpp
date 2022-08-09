@@ -109,7 +109,7 @@ void show_projected_img(std::vector<bloody::point2di_type> imagePts_projected, a
         waitKey(0);
     }
     else{
-        waitKey(100);
+        waitKey(1);
     }
     
     return;
