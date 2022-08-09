@@ -39,7 +39,7 @@ int main()
   bloody::CamInfo_type caminfo{500.0f, bloody::point2di_type{640, 360}}; // inner parameter of camera
   
   // set init pose change
-  Matx31f Rvec = Matx31f(2.5, 2.1, 2.4);
+  Matx31f Rvec = Matx31f(2.5, 3.1, 2.4);
   bloody::point3d_type trans = bloody::point3d_type{-700, 609, -1300};
   Matx33f dst;
   Rodrigues(Rvec, dst, noArray());
