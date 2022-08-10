@@ -8,6 +8,7 @@
 #include <pcl-1.10/pcl/visualization/cloud_viewer.h>
 #include <pcl-1.10/pcl/console/parse.h>
 #include "./softposit/softposit.hpp"
+#include<algorithm>
 
 using namespace std;
 
@@ -16,6 +17,7 @@ vector<float> read_pcd_from_json(){
     Json::Value root;
     vector<float> worldPts;
     pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
+    float xmin=1000,ymin=1000,zmin=1000,xmax=0,ymax=0,zmax=0;
     ifstream srcFile("../toy_data/registration.json", ios::binary);
     if (!srcFile.is_open()){
         cout<<"Fail to open src.json"<<endl;
@@ -36,9 +38,16 @@ vector<float> read_pcd_from_json(){
             point_cloud_ptr->points[i].y = root["scene_points"][i][1].asFloat();
             point_cloud_ptr->points[i].z = root["scene_points"][i][2].asFloat();
             //point_cloud_ptr->points.push_back (point);
+            xmin = min(xmin, point_cloud_ptr->points[i].x);
+            ymin = min(ymin, point_cloud_ptr->points[i].y);
+            zmin = min(zmin, point_cloud_ptr->points[i].z);
+            xmax = max(xmax, point_cloud_ptr->points[i].x);
+            ymax = max(ymax, point_cloud_ptr->points[i].y);
+            zmax = max(zmax, point_cloud_ptr->points[i].z);
         }
     }
-    cout<<worldPts.size()<<endl;
+    cout<<xmin<<" "<<ymin<<" "<<zmin<<endl;
+    cout<<xmax<<" "<<ymax<<" "<<zmax<<endl;
     pcl::io::savePCDFile("../toy.pcd", *point_cloud_ptr);
     system("pause");
     return worldPts;

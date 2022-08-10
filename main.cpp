@@ -5,6 +5,7 @@
 #include <vector>
 #include "./softposit/softposit.hpp"
 #include "./softposit/softposit.cpp"
+#include "./curve_generator.cpp"
 
 using namespace cv;
 
@@ -17,7 +18,8 @@ int main()
     raw_imagePts = read_img_to_point(); // read_image_file
     vector<float> raw_worldPts;
     raw_worldPts = read_pcd_from_json(); // read json file
-    
+    raw_worldPts = rrtAlgorithm(0, 0, 0, 8, 8, 8, 0.3, 5, 5, 5, 0.5, 0.5, 5000);
+    std::cout<<raw_worldPts.size()<<std::endl;
     // transform points to arma type
     std::vector<bloody::point2di_type> imagePts;
     std::vector<bloody::point3d_type> worldPts;
@@ -39,8 +41,8 @@ int main()
   bloody::CamInfo_type caminfo{500.0f, bloody::point2di_type{640, 360}}; // inner parameter of camera
   
   // set init pose change
-  Matx31f Rvec = Matx31f(2.5, 3.1, 2.4);
-  bloody::point3d_type trans = bloody::point3d_type{-700, 609, -1300};
+  Matx31f Rvec = Matx31f(4.5, -3.1, 5.4);
+  bloody::point3d_type trans = bloody::point3d_type{-500, -309, -1300};
   Matx33f dst;
   Rodrigues(Rvec, dst, noArray());
   arma::mat R_change(3,3);
@@ -58,20 +60,19 @@ int main()
   bloody::Pose_type initPose, gtPose;
   gtPose.rot = rot2(arma::span(0,2), arma::span(0,2));//arma::mat("0.82311, -0.33426, -0.45906;0.44522, -0.122, 0.88705;-0.35258, -0.93459, 0.048413");//("0.8231, 0.4452, -0.3525; -0.3343, -0.122, -0.9345; -0.4591, 0.8871, 0.0484");
   gtPose.trans = bloody::point3d_type{rot2(0,3), rot2(1,3), rot2(2,3)};//{-73.420, -223.39718, -66.29930}
-  std::vector<bloody::point2di_type> imagePts_projected=imagePts; //imagePts
-  //imagePts_projected = project_3DPoints(worldPts,imagePts_projected,  gt_pose.rot,  gt_pose.trans, caminfo);   // project worldPts to 2D imagePts_projected(at read_pcd.cpp)
+  std::vector<bloody::point2di_type> imagePts_projected; //imagePts
+  imagePts_projected = project_3DPoints(worldPts,imagePts_projected,  gtPose.rot,  gtPose.trans, caminfo);   // project worldPts to 2D imagePts_projected(at read_pcd.cpp)
   
   
   //---------------------------------------------------------create init pose----------------------------------------------------------------
-  int nImagePts = imagePts_projected.size();
   initPose.rot = arma::mat("0.82311, -0.33426, -0.45906; 0.44522, -0.122, 0.88705;-0.35258, -0.93459, 0.048413");
   initPose.rot = R_change*initPose.rot;
-  
   initPose.trans = bloody::point3d_type{-73.420, -223.39718, -66.29930}+trans;
   
   // imagePts_projected = project_3DPoints(worldPts, imagePts_projected,  initPose.rot,  initPose.trans, caminfo);
   std::vector<bloody::point2di_type> initProject;
   initProject = project_3DPoints(worldPts, initProject,  initPose.rot,  initPose.trans, caminfo);
+  int nImagePts = imagePts_projected.size();
   arma::mat imageOnes = arma::ones<arma::mat>(nImagePts, 1)*2;
   arma::mat color_map = arma::join_rows(color_map, imageOnes);
   show_projected_img(initProject, color_map, true);
