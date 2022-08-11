@@ -274,9 +274,9 @@ vector<float> rrtAlgorithm(double xstart, double ystart, double zstart, double g
     int xmin = 0;
     int ymin = 0;
     int zmin = 0;
-    int xmax = 10;
-    int ymax = 10;
-    int zmax = 10;
+    int xmax = 20;
+    int ymax = 20;
+    int zmax = 20;
 
     //a vector containing all the nodes with its parent values
     std::vector<theNode> tree;

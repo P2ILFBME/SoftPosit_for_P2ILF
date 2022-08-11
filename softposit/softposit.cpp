@@ -22,7 +22,7 @@ namespace bloody{
         std::vector<stat_info> stats;
         //----------------------------------------init parameter--------------------------------------------------
         auto alpha = 5;//9.21*pow(param.noiseStd,2) + 1;
-        auto maxDelta = 10;  //sqrt(alpha)/2; 20;         //  Max allowed error per world point.
+        auto maxDelta = 5;  //sqrt(alpha)/2; 20;         //  Max allowed error per world point.
         auto bestDelta = 1e5;
         auto maxMatch = 0;
         auto betaFinal = 0.5;                  // Terminate iteration when beta == betaFinal.
@@ -54,10 +54,13 @@ namespace bloody{
         int size1 = imagePts_projected.size();
         imagePts_projected = project_3DPoints(worldPts, imagePts_projected, initpose.rot,  initpose.trans, caminfo);
         int size2 = imagePts_projected.size();
-        imageColors = arma::ones<arma::mat>(size2-size1, 1)*0;
-        color_map = arma::join_cols(color_map, imageColors);
-        show_projected_img(imagePts_projected, color_map);
-        color_map(arma::span(size1,size2-1),0)=arma::ones<arma::mat>(size2-size1, 1)*1;
+        if(size2>size1){
+            imageColors = arma::ones<arma::mat>(size2-size1, 1)*0;
+            color_map = arma::join_cols(color_map, imageColors);
+            show_projected_img(imagePts_projected, color_map);
+            color_map(arma::span(size1,size2-1),0)=arma::ones<arma::mat>(size2-size1, 1)*1;
+        }
+        
         std::cout<<"init: "<<std::endl<<initpose.rot<<std::endl<<initpose.trans<<std::endl;
         //------------------------------------------------------------------------------------------------------------
         //-------------------------------------------preprocess data--------------------------------------------------
@@ -222,7 +225,7 @@ namespace bloody{
 
                 std::cout<<"delta"<<std::endl;
                 delta = sqrt(arma::accu(assignMat.submat(0, 0, nbImagePts-1, nbWorldPts-1) % distMat)/nbWorldPts);
-                poseConverged = delta < maxDelta;
+                poseConverged = delta < maxDelta && numMatchPts > 0.6*nbWorldPts;
                 std::cout<<"delta    "<<delta<<std::endl;
                 std::cout<<"pose converged:"<<poseConverged<<std::endl;
 
@@ -297,7 +300,7 @@ namespace bloody{
             
         }
         std::cout<<"pose converged:"<<std::endl << pose.rot<<pose.trans<<std::endl;
-        show_projected_img(imagePts_projected, color_map);
+        show_projected_img(imagePts_projected, color_map, true);
         std::cout<<bestDelta<<std::endl;
         return make_tuple(bestPose, match_type());
   }

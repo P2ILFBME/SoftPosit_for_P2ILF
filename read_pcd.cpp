@@ -12,17 +12,18 @@
 
 using namespace std;
 
-vector<float> read_pcd_from_json(){
+vector<float> read_pcd_from_json(string jsonPath="../toy_data/registration.json"){
     Json::Reader reader;
     Json::Value root;
     vector<float> worldPts;
     pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr (new pcl::PointCloud<pcl::PointXYZ>);
     float xmin=1000,ymin=1000,zmin=1000,xmax=0,ymax=0,zmax=0;
-    ifstream srcFile("../toy_data/registration.json", ios::binary);
+    ifstream srcFile(jsonPath, ios::binary);
     if (!srcFile.is_open()){
         cout<<"Fail to open src.json"<<endl;
     }
-    if (! reader.parse(srcFile, root)){
+    reader.parse(srcFile, root);
+    if (1){
         cout<<root.size()<<endl;
         point_cloud_ptr->width = 1;
         point_cloud_ptr->height= root["scene_points"].size();

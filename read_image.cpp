@@ -4,11 +4,12 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <iostream>
 #include "./softposit/softposit.hpp"
+
 using namespace cv;
 using namespace std;
-vector<int> read_img_to_point(){
-    char imageName[] = "./toy_data/image.png";
-    Mat M = imread("../toy_data/image.png", IMREAD_COLOR);
+vector<int> read_img_to_point(string imageName = "./toy_data/image.png"){
+    
+    Mat M = imread(imageName, IMREAD_COLOR);
     if(M.empty()){
         std::cout<<"error!"<<std::endl;
     }
@@ -27,7 +28,7 @@ vector<int> read_img_to_point(){
           
             if(bgr[2]>50){
             
-            if(num_count%1==0){
+            if(num_count%10==0){
                 linepoints.push_back(i);
                 linepoints.push_back(k);
             }
