@@ -13,7 +13,10 @@ using namespace std;
 
 string JSON_PATH = "../toy_data/3/registration.json";
 string IMAGE_PATH = "../toy_data/3/label.png";
-
+string JPG_PATH = "../try_data/Inked093.jpg";
+string PLY_PATH = "../try_data/Liver_sect.ply";
+int IMAGE_WIDTH = 1280;
+int IMAGE_HEIGHT = 720;
 void get_worldPts(std::vector<bloody::point3d_type>& worldPts, bool bezier_key)
 {
     vector<float> raw_worldPts;
@@ -22,6 +25,7 @@ void get_worldPts(std::vector<bloody::point3d_type>& worldPts, bool bezier_key)
     }
     else{
         raw_worldPts = read_pcd_from_json(JSON_PATH); // read json file
+        //raw_worldPts = read_pcd_from_ply(PLY_PATH);
     }
     
     for (uint i=0u; i<raw_worldPts.size(); i+=3)
@@ -37,9 +41,10 @@ void get_imagePts_projected(std::vector<bloody::point2di_type> &imagePts_project
     {
         vector<int> raw_imagePts;
         raw_imagePts = read_img_to_point(IMAGE_PATH);
+        // raw_imagePts = read_img_to_point2(JPG_PATH);
         for (uint i=0u; i<raw_imagePts.size(); i+=2)
         {
-            imagePts_projected.push_back(bloody::point2di_type{1280-raw_imagePts[i+1], raw_imagePts[i]});      // get image points in (x, y) format
+            imagePts_projected.push_back(bloody::point2di_type{raw_imagePts[i+1], raw_imagePts[i]});      // get image points in (x, y) format
             //cout<<raw_imagePts[i]<<" "<<raw_imagePts[i+1]<<endl;
         }
     }
@@ -50,7 +55,7 @@ void get_imagePts_projected(std::vector<bloody::point2di_type> &imagePts_project
     if (curveFit)
         {
            cv::Mat A;
-           FitPolynomialCurve(imagePts_projected, fitImagePts, 4,  A); 
+           FitPolynomialCurve(imagePts_projected, fitImagePts, 5,  A); 
            imagePts_projected = fitImagePts;
         }
     
@@ -74,8 +79,10 @@ bool evaluation(bloody::Pose_type& initPose, bloody::Pose_type& gtPose, double r
 {
     double rte;
     rte = arma::sum(arma::square(initPose.trans-gtPose.trans));
-    cout<<sqrt(rte)<<endl;
-    if (sqrt(rte)<10){
+    cout<<initPose.trans<<endl;
+    cout<<gtPose.trans<<endl;
+    cout<<"distance: "<<sqrt(rte)<<endl;
+    if (sqrt(rte)<50){
         return true;
     }
     return false;
@@ -108,20 +115,25 @@ void load_gt_from_json(string jsonPath, bloody::Pose_type& gtPose)
 
 int run()
 {   
+    bool CREATE_BAZIER = true;
+    bool LOAD_IMAGE = false;
+    bool FIT_POINT = false;
+    srand((int)time(0));
     std::vector<bloody::point2di_type> imagePts;
     std::vector<bloody::point3d_type> worldPts;
-    get_worldPts(worldPts, false);  // bezier key
+    get_worldPts(worldPts, CREATE_BAZIER);  // bezier key
     std::vector<bloody::point2di_type> imagePts_projected;
     bool result;
-    bloody::Param_type param{ 0.00004, 10.0}; //0.001
-    bloody::CamInfo_type caminfo{500.0f, bloody::point2di_type{640, 360}}; // inner parameter of camera
+    bloody::Param_type param{ 0.000004, 10.0}; //0.001
+    bloody::CamInfo_type caminfo{500.0f, bloody::point2di_type{640, 360}}; // inner parameter of camera //bloody::CamInfo_type caminfo{1.2798129504457850e+03, bloody::point2di_type{9.5517296017490582e+02, 4.9916618960910012e+02}}
+    // bloody::CamInfo_type caminfo{1.2798129504457850e+03, bloody::point2di_type{955, 499}};
     arma::mat rot2 = arma::mat("0.8231, 0.4452, -0.3525, 136.5396; -0.3343, -0.122, -0.9345, -113.6996; -0.4591, 0.8871, 0.0484, 167.6742; 0,0,0,1");
     rot2 = arma::inv(rot2);
     bloody::Pose_type initPose, gtPose;
     bool randomGt=false;
     do{
         imagePts_projected.clear();
-        if(randomGt){
+        if(randomGt && (!CREATE_BAZIER&&LOAD_IMAGE)){
             gtPose.rot = rot2(arma::span(0,2), arma::span(0,2));//arma::mat("0.82311, -0.33426, -0.45906;0.44522, -0.122, 0.88705;-0.35258, -0.93459, 0.048413");//("0.8231, 0.4452, -0.3525; -0.3343, -0.122, -0.9345; -0.4591, 0.8871, 0.0484");
             gtPose.trans = bloody::point3d_type{rot2(0,3), rot2(1,3), rot2(2,3)};//{-73.420, -223.39718, -66.29930}
             // get_noised_pose(gtPose, gtPose, Matx31f(-0.6+(rand()%14)/10.0, -0.3+(rand()%6)/10.0, -0.5+(rand()%10)/10.0), bloody::point3d_type{0, 0, 0});   //(rand()%7)/10.0
@@ -129,12 +141,16 @@ int run()
         else{
             load_gt_from_json(JSON_PATH, gtPose);
         }
-        get_imagePts_projected(imagePts_projected, worldPts, caminfo, gtPose, false, true); 
+       
+        get_imagePts_projected(imagePts_projected, worldPts, caminfo, gtPose,  (!CREATE_BAZIER)&&LOAD_IMAGE&&FIT_POINT, 
+                               !CREATE_BAZIER&&LOAD_IMAGE); 
     }
     while(imagePts_projected.size()==0);
     Matx31f Rvec = Matx31f(-3+rand()%6, -3+rand()%6, -3+rand()%6);      // -3+rand()%6, -3+rand()%6, -3+rand()%6
     bloody::point3d_type trans = bloody::point3d_type{double(-900+rand()%1800),double(-300+rand()%600),-1300};   // double(-900+rand()%1800),double(-300+rand()%600),-1300
     get_noised_pose(initPose, gtPose, Rvec, trans);
+    //initPose.rot = arma::mat("0.90383,-0.42299, 0.064602; -0.13234, -0.13275, 0.98227; -0.40692, -0.89636, -0.17596");
+    //initPose.trans = bloody::point3d_type{-117.03, -87.321, -40.064};
     
     // transform points to arma type
     
@@ -148,12 +164,13 @@ int run()
     int nImagePts = initProject.size();
     arma::mat imageOnes = arma::ones<arma::mat>(nImagePts, 1)*2;
     arma::mat color_map = arma::join_rows(color_map, imageOnes);
-    show_projected_img(initProject, color_map, true);
+    show_projected_img(initProject, color_map, false);
     
 
   //begin softposit
     bloody::Param_type param2 = param;
     for(int i =0;i<10;i++){
+         cout<<"---------------try: "<<i<<"-----------------------"<<endl;
         try{
             bloody::Pose_type pose;
             auto maybe_pose = softposit(
@@ -165,8 +182,8 @@ int run()
                 );
             if (maybe_pose){
                 pose = std::get<0>(*maybe_pose);
-                std::cout<<pose.rot<<std::endl;
-                std::cout<<pose.trans<<std::endl;
+                // std::cout<<pose.rot<<std::endl;
+                // std::cout<<pose.trans<<std::endl;
                 //int size1 = imagePts_projected.size();
                 //color_map = arma::ones<arma::mat>(size1, 1)*2;
                 //imagePts_projected = project_3DPoints(worldPts, imagePts_projected,  initPose.rot,  initPose.trans, caminfo);
@@ -183,7 +200,9 @@ int run()
                     Matx31f Rvec = Matx31f(-3+rand()*6, -3+rand()*6, -3+rand()*6);
                     bloody::point3d_type trans = bloody::point3d_type{double(-900+rand()%1800),double(-300+rand()%600),-1300};   //-500,-309,-1300
                     get_noised_pose(initPose, gtPose, Rvec, trans);
-                    param2 = param;
+                    //initPose = pose;
+                    //param2 = param;
+                    //param2.beta0 = param2.beta0/10;
                 }
         }
             else
@@ -192,7 +211,9 @@ int run()
                 Matx31f Rvec = Matx31f(-3+rand()*6, -3+rand()*6, -3+rand()*6);
                 bloody::point3d_type trans = bloody::point3d_type{double(-900+rand()%1800),double(-300+rand()%600),-1300};   //-500,-309,-1300
                 get_noised_pose(initPose, gtPose, Rvec, trans);
-                param2 = param;
+                //initPose = pose;
+                //param2 = param;
+                //param2.beta0 = param2.beta0/10;
                 
             }
     }
@@ -210,7 +231,8 @@ int run()
         }
         
         imagePts_projected.clear();
-        get_imagePts_projected(imagePts_projected, worldPts, caminfo, gtPose, false, false);
+        get_imagePts_projected(imagePts_projected, worldPts, caminfo, gtPose,  (!CREATE_BAZIER)&&LOAD_IMAGE&&FIT_POINT, 
+                               (!CREATE_BAZIER)&&LOAD_IMAGE);
         
     }
   // show result
@@ -222,7 +244,10 @@ int main()
     double numRun = 1;
     double valid_num = numRun;
     double success_num = 0;
+    //read_img_to_point2("../try_data/Inked093.jpg");
+    //read_pcd_from_ply();
     for(int i=0; i<numRun;i++){
+       
         try{
             success_num += run();
         }

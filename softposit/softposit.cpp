@@ -1,14 +1,17 @@
 #include "softposit.hpp"
 #include <boost/format.hpp>
-
+#include <json/json.h>
+#include<fstream>
 namespace bloody{
 
   using stat_info = arma::vec5;
   std::tuple<arma::umat, arma::mat> maxPosRatio(arma::mat assignMat);
   arma::mat sinkhornSlack(arma::mat M);
   arma::mat sinkhornImp(arma::mat M);
-  int numMatches(arma::mat assignMat);
-
+  int numMatches(arma::mat assignMat, std::vector<point2di_type> &corresspondenceIdx);
+  void writeFileJson(double shapeMatchResult, double delta, double numMatch);
+  void writeFileText(string filename, double shapeMatchResult, double delta, double numMatch);
+  int RunCounter = 0;
   boost::optional< std::tuple<Pose_type, match_type> > softposit(
     const std::vector<point2di_type>& imagePts,
     const std::vector<point3d_type>& worldPts,
@@ -22,7 +25,7 @@ namespace bloody{
         std::vector<stat_info> stats;
         //----------------------------------------init parameter--------------------------------------------------
         auto alpha = 5;//9.21*pow(param.noiseStd,2) + 1;
-        auto maxDelta = 5;  //sqrt(alpha)/2; 20;         //  Max allowed error per world point.
+        auto maxDelta = 6;  //sqrt(alpha)/2; 20;         //  Max allowed error per world point.
         auto bestDelta = 1e5;
         auto maxMatch = 0;
         auto betaFinal = 0.5;                  // Terminate iteration when beta == betaFinal.
@@ -44,6 +47,7 @@ namespace bloody{
         arma::mat color_map = arma::join_rows(color_map, imageColors);
         double maxNumMatch=0;
         CamInfo_type caminfo;
+        string filename = to_string(RunCounter)+".txt"; 
         if (maybe_caminfo)
             caminfo = *maybe_caminfo;
         else{
@@ -130,15 +134,17 @@ namespace bloody{
             //std::cout<<"dist mat:"<<std::endl<<distMat<<std::endl;
             
             assignMat(arma::span(0, nbImagePts-1), arma::span(0, nbWorldPts-1)) = scale*arma::exp(-beta*(distMat - alpha));
-            assignMat.col(nbWorldPts) = scale*arma::exp(-beta*arma::ones<arma::vec>(nbImagePts+1)*1e10-alpha);
-            assignMat.row(nbImagePts) = scale*arma::exp(-beta*arma::ones<arma::vec>(nbWorldPts+1)*1e10-alpha).t(); //scale
+            assignMat.col(nbWorldPts) = scale*arma::exp(-beta*(arma::ones<arma::vec>(nbImagePts+1)*1e5-alpha));
+            assignMat.row(nbImagePts) = scale*arma::exp(-beta*(arma::ones<arma::vec>(nbWorldPts+1)*1e5-alpha)).t(); //scale
+            
             //std::cout<<"assign befor sinkhorn:"<<std::endl<<assignMat<<std::endl;
             //assignMat = sinkhornImp (assignMat);    // My "improved" Sinkhorn.
+            std::cout<<"before sinkhorn Slack:"<<std::endl<<assignMat<<std::endl;
             assignMat = sinkhornSlack (assignMat);
             
-            //std::cout<<"after sinkhorn Slack:"<<std::endl<<assignMat<<std::endl;
-
-            auto numMatchPts = numMatches(assignMat);
+            std::cout<<"after sinkhorn Slack:"<<std::endl<<assignMat<<std::endl;
+            std::vector<point2di_type> corresspondenceIdx;
+            auto numMatchPts = numMatches(assignMat, corresspondenceIdx);
             std::cout<<"num matches: "<<numMatchPts<<std::endl;
 
             auto sumNonslack = arma::accu(assignMat.submat(0,0,nbImagePts-1,nbWorldPts-1));
@@ -164,6 +170,7 @@ namespace bloody{
             catch(runtime_error error){
                 show_projected_img(imagePts_projected, color_map);
                 throw runtime_error("can't get result!");
+                return make_tuple(bestPose, match_type());
             }
             poseConverged = 0;                              // Initialize for POSIT loop.
             int pose_iter_count = 0;
@@ -223,13 +230,13 @@ namespace bloody{
 
                 wk = homogeneousWorldPts * r3T /Tz;
 
-                std::cout<<"delta"<<std::endl;
+                //std::cout<<"delta"<<std::endl;
                 delta = sqrt(arma::accu(assignMat.submat(0, 0, nbImagePts-1, nbWorldPts-1) % distMat)/nbWorldPts);
                 poseConverged = delta < maxDelta && numMatchPts > 0.6*nbWorldPts;
-                std::cout<<"delta    "<<delta<<std::endl;
-                std::cout<<"pose converged:"<<poseConverged<<std::endl;
+                //std::cout<<"delta    "<<delta<<std::endl;
+                //std::cout<<"pose converged:"<<poseConverged<<std::endl;
 
-                std::cout<<"generate trace"<<std::endl;
+                //std::cout<<"generate trace"<<std::endl;
 
                 std::vector<double> trace = std::vector<double>{
                 beta ,delta ,double(numMatchPts)/nbWorldPts ,
@@ -237,7 +244,7 @@ namespace bloody{
                 arma::accu(arma::square(r1T-r1Tprev)) + arma::accu(arma::square(r2T-r2Tprev))
                 };
 
-                std::cout<<"keep log"<<std::endl;
+                //std::cout<<"keep log"<<std::endl;
                 stats.push_back(arma::vec( trace));
 
                 pose_iter_count = pose_iter_count + 1;
@@ -247,13 +254,15 @@ namespace bloody{
                 
             }
             
-            if(numMatchPts==0 or maxNumMatch==numMatchPts){
+            if(numMatchPts==0){
                 betaUpdate = (1.1-0.09/400.0*delta)*(delta<400)+1.01*(delta>=400);
                 beta = betaUpdate * beta;
             }
             betaUpdate = (1.1-0.09/400.0*delta)*(delta<400)+1.01*(delta>=400);
             beta = betaUpdate * beta;
+            
             std::cout<<"beta:  "<<beta<<std::endl;
+            std::cout<<"betaUpdate:  "<<betaUpdate<<std::endl;
             betaCount = betaCount + 1;
             assignConverged = (poseConverged && numMatchPts > 0.8*nbWorldPts);
 
@@ -263,20 +272,29 @@ namespace bloody{
             pose.rot.row(2) = r3.t();
 
             foundPose = (delta < maxDelta && numMatchPts > 0.8*nbWorldPts);
+            std::vector<bloody::point2di_type> projected_contour;
+            projected_contour = project_3DPoints(worldPts, projected_contour, pose.rot,  pose.trans, caminfo);
+            double shapeMatchResult = calculate_shape_contour(projected_contour, imagePts);
 
             std::cout<<"updated pose:"<<std::endl<<pose.rot<<std::endl<<pose.trans<<std::endl;
             //%% Log:
             std::cout<<"converge loop ends"<<std::endl;
-            std::cout<<boost::format("pose found:%1%, delta exit:%2%, count exit:%3%")%foundPose%(delta<maxDelta)%(betaCount>minBetaCount)<<std::endl;
+            std::cout<<boost::format("pose found:%1%, delta:%2%, count exit:%3%, beta:%4%")
+            %foundPose%(delta)%(betaCount>minBetaCount)%(beta)<<std::endl; 
+            writeFileText(filename, shapeMatchResult, delta, double(numMatchPts));
+            
+            // --------------------------------------------show result----------------------------------------------------
             int size1 = imagePts_projected.size();
-            imagePts_projected = project_3DPoints(worldPts, imagePts_projected, pose.rot,  pose.trans, caminfo);
+            imagePts_projected = project_3DPoints(worldPts, imagePts_projected, bestPose.rot,  bestPose.trans, caminfo);
             int size2 = imagePts_projected.size();
+            
             if(size2>size1)
             {
                 if(beta < betaFinal && !assignConverged){
                     imageColors = arma::ones<arma::mat>(size2-size1, 1)*0;
                     color_map = arma::join_cols(color_map, imageColors);
-                    show_projected_img(imagePts_projected, color_map);
+                    //show_projected_img(imagePts_projected, color_map);
+                    show_projected_img_with_corr(imagePts_projected, color_map, corresspondenceIdx, size1, false);
                     color_map(arma::span(size1,size2-1),0)=arma::ones<arma::mat>(size2-size1, 1)*1;
                     
                 }
@@ -302,6 +320,7 @@ namespace bloody{
         std::cout<<"pose converged:"<<std::endl << pose.rot<<pose.trans<<std::endl;
         show_projected_img(imagePts_projected, color_map, true);
         std::cout<<bestDelta<<std::endl;
+        RunCounter +=1;
         return make_tuple(bestPose, match_type());
   }
 
@@ -344,7 +363,7 @@ namespace bloody{
   }
 
 
-  int numMatches(arma::mat assignMat)
+  int numMatches(arma::mat assignMat, std::vector<point2di_type> &corresspondenceIdx)
   {
     int num = 0;
 
@@ -362,8 +381,10 @@ namespace bloody{
       other_cols.reserve(assignMat.n_cols-1);
       for (int i=0; i<assignMat.n_cols; ++i)
         if (i!=k) other_cols.push_back(i);
-      if (arma::all(arma::all(vmax > assignMat.submat(arma::uvec{imax},arma::uvec(other_cols)))))
+      if (arma::all(arma::all(vmax > assignMat.submat(arma::uvec{imax},arma::uvec(other_cols))))){
         num = num + 1;              // This value is maximal in its row & column.
+        corresspondenceIdx.push_back(bloody::point2di_type{imax, k});
+      }
     }
     return num;
   }
@@ -457,7 +478,40 @@ namespace bloody{
 
     return std::make_tuple(pos, ratios);
   }
+  
+  void writeFileJson(double shapeMatchResult, double delta, double numMatch)
+  {
+      ifstream is;
+      ofstream os;
+      Json::Value root;
+      Json::Reader reader;
+      os.open("finalResult.json", std::ios::out);
+      os.close();
+      is.open("finalResult.json", ios::binary);
+      reader.parse(is, root);
+      is.close();
+      if (!os.is_open()){
+         cout << "error£ºcan not find or create the file which named \" finalResult.json\"." << endl;
+      }
+      
+      root["shapeMatchResult"].append("ttttt");
+      root["delta"].append(Json::Value("kjkjk"));
+      root["numMatch"]="kjjkjh";
+      //cout<<"1"<<endl;
+      os.open("finalResult.json", std::ios::out);
+      Json::StyledWriter sw;
+      os << sw.write(root);
+      os.close();
+}
 
+void writeFileText(string filename, double shapeMatchResult, double delta, double numMatch)
+{
+    ofstream ofs;  
+    ofs.open(filename,ios::out|ios::app );
+    ofs.setf(ios_base::showpoint);
+    ofs<<shapeMatchResult<<"\t"<<delta<<"\t"<<numMatch<<endl;
+    ofs.close();
+}
   void softposit(float* rot, float* trans, int* foundPose, int* _imagePts, float* _worldPts, int nbImagePts, int nbWorldPts, float beta0, float noiseStd, float* initRot, float* initTrans, float* focalLength, int* center)
   {
 
@@ -488,3 +542,4 @@ namespace bloody{
     }
   }
 }
+

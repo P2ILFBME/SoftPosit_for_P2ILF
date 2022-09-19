@@ -15,6 +15,7 @@ FIND_PACKAGE(PCL 1.10 REQUIRED COMPONENTS common io visualization ) # you can ad
 include_directories("/usr/include/pcl-1.10" "/usr/include/vtk-7.1")
 link_directories(${PCL_LIBRARY_DIRS}) # 当找到PCL库时，PCL_LIBRARY_DIRS会被自动设置
 
+target_link_libraries(${try} /usr/local/lib/libjsoncpp.a)
 target_link_libraries(${try} libjsoncpp.a)
 target_link_libraries(${try}  armadillo)
 target_link_libraries(${try} ${OpenCV_LIBS})

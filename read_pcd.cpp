@@ -3,13 +3,15 @@
 #include <json/json.h>
 #include <fstream>
 #include <pcl-1.10/pcl/common/common_headers.h>
-#include <pcl-1.10/pcl/io/pcd_io.h>
+#include <pcl-1.10/pcl/io/ply_io.h>
 #include <pcl-1.10/pcl/visualization/pcl_visualizer.h>
 #include <pcl-1.10/pcl/visualization/cloud_viewer.h>
 #include <pcl-1.10/pcl/console/parse.h>
 #include "./softposit/softposit.hpp"
 #include<algorithm>
 
+extern int IMAGE_HEIGHT;
+extern int IMAGE_WIDTH;
 using namespace std;
 
 vector<float> read_pcd_from_json(string jsonPath="../toy_data/registration.json"){
@@ -49,11 +51,25 @@ vector<float> read_pcd_from_json(string jsonPath="../toy_data/registration.json"
     }
     cout<<xmin<<" "<<ymin<<" "<<zmin<<endl;
     cout<<xmax<<" "<<ymax<<" "<<zmax<<endl;
-    pcl::io::savePCDFile("../toy.pcd", *point_cloud_ptr);
-    system("pause");
+    //pcl::io::savePCDFile("../toy.pcd", *point_cloud_ptr);
+    //system("pause");
     return worldPts;
 }
-
+vector<float> read_pcd_from_ply(string plyPath="../try_data/Liver_sect.ply"){
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    vector<float> worldPts;
+    if(pcl::io::loadPLYFile<pcl::PointXYZ>(plyPath, *cloud)==-1){
+        cout<<"could not read file."<<endl;
+        system("pause");
+        return worldPts;
+    }
+    for(auto point:cloud->points){
+        worldPts.push_back(point.x);
+        worldPts.push_back(point.y);
+        worldPts.push_back(point.z);
+    }
+    return worldPts;
+}
 std::vector<bloody::point2di_type> project_3DPoints(std::vector<bloody::point3d_type> worldPts, std::vector<bloody::point2di_type> older_image_pts, arma::mat rot,  bloody::point3d_type trans, bloody::CamInfo_type caminfo) // try to project point cloud data to image
 {   
     float f = caminfo.focalLength;
@@ -64,7 +80,7 @@ std::vector<bloody::point2di_type> project_3DPoints(std::vector<bloody::point3d_
         auto w = arma::dot(rot.row(2),worldPts[i])+trans(2);
         auto x = arma::dot(rot.row(0),worldPts[i])+trans(0);
         auto y = arma::dot(rot.row(1),worldPts[i])+trans(1);
-        if(((f*x/w+caminfo.center(0))<1280)&&((f*x/w+caminfo.center(0)))>0&&((f*y/w+caminfo.center(1)))>0&&((f*y/w+caminfo.center(1)))<720){
+        if(((f*x/w+caminfo.center(0))<IMAGE_WIDTH)&&((f*x/w+caminfo.center(0)))>0&&((f*y/w+caminfo.center(1)))>0&&((f*y/w+caminfo.center(1)))<IMAGE_HEIGHT){
         
             imagePts.push_back((bloody::point2di_type{f*x/w, f*y/w}+caminfo.center));
         }
